@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>Interactive Diwali Wish</title>
+  <style>
+    :root{--bg:#ffd6e8;--accent:#ff79c6;--muted:#ffe8f3}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,var(--bg),#ffeef8);display:flex;align-items:center;justify-content:center}
+    .card{width:100%;max-width:430px;height:85vh;background:rgba(255,255,255,0.08);backdrop-filter:blur(6px);border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,0.12);position:relative;overflow:hidden;padding:18px;display:flex;flex-direction:column}
+    .hearts{position:absolute;inset:0;pointer-events:none}
+    .heart{position:absolute;opacity:0.18;font-size:26px;transform:translate(-50%,-50%);animation:float 8s linear infinite}
+    @keyframes float{0%{transform:translateY(20px) scale(0.9)}50%{transform:translateY(-40px) scale(1.05)}100%{transform:translateY(20px) scale(0.9)}}
+
+    .screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px}
+    h1{font-size:20px;margin:8px 0;color:#4b0b3a}
+    p{color:#6b2346;margin:6px 0}
+
+    .buttons{display:flex;gap:12px;margin-top:18px}
+    button{padding:12px 18px;border-radius:999px;border:2px solid rgba(255,255,255,0.3);background:linear-gradient(180deg,#fff,#ffe8f3);box-shadow:0 6px 12px rgba(0,0,0,0.06);font-weight:600}
+    .btn-yes{background:linear-gradient(180deg,#fff,#ffd7ec);color:var(--accent)}
+    .btn-no{position:relative}
+
+    /* small footer */
+    .footer{font-size:12px;color:#7a3a53;padding:8px 0;text-align:center}
+
+    /* balloon animation on final page */
+    .balloons{position:absolute;left:0;right:0;top:-10%;height:50vh;pointer-events:none}
+    .balloon{position:absolute;bottom:-20%;width:44px;height:56px;border-radius:50%;display:inline-block;animation:rise linear infinite;opacity:0.95}
+    .balloon::after{content:'';position:absolute;left:50%;bottom:-14px;width:2px;height:16px;background:rgba(0,0,0,0.06);transform:translateX(-50%)}
+    @keyframes rise{0%{transform:translateY(0) scale(1)}100%{transform:translateY(-140vh) scale(1.02)}}
+
+    /* small responsive tweaks */
+    @media (max-width:420px){.card{height:92vh;border-radius:14px;padding:14px}h1{font-size:18px}};
+  </style>
+</head>
+<body>
+  <div class="card" id="app">
+    <div class="hearts" id="hearts"></div>
+
+    <!-- screens container -->
+    <div class="screen" id="screen">
+      <h1 id="title">You have 2 minutes?</h1>
+      <p id="subtitle">Can you spare two minutes for a small Diwali surprise?</p>
+      <div class="buttons" id="buttons">
+        <button id="yes" class="btn-yes">Yes</button>
+        <button id="no" class="btn-no">No</button>
+      </div>
+    </div>
+
+    <div class="footer">Made with ❤️ — Tap the buttons</div>
+
+    <!-- balloons container for final screen -->
+    <div class="balloons" id="balloons" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    // --- configuration ---
+    const sisterName = 'My Lovely Sister'; // <-- change this to your sister's name
+    const pages = [
+      {title: 'Sweet? 😍', text: `I made something cute just for you, ${sisterName}!`},
+      {title: 'Memory', text: 'Remember when we used to burst diyas together? ✨'},
+      {title: 'Promise', text: 'I promise this will make you smile — just a little more!'},
+      {title: 'Almost there', text: 'Just one more tap and a surprise appears 🎁'},
+      {title: 'Ready?', text: 'Are you ready to see the surprise?'},
+      {title: 'Final', text: `Happy Diwali to ${sisterName}! ❤️🎈\nLove you!`}
+    ];
+
+    // --- initial state ---
+    let pageIndex = 0;
+    const screen = document.getElementById('screen');
+    const titleEl = document.getElementById('title');
+    const subtitleEl = document.getElementById('subtitle');
+    const yesBtn = document.getElementById('yes');
+    const noBtn = document.getElementById('no');
+    const heartsContainer = document.getElementById('hearts');
+    const balloonsContainer = document.getElementById('balloons');
+
+    // create floating hearts background
+    function createHearts(n=12){
+      for(let i=0;i<n;i++){
+        const el=document.createElement('div');
+        el.className='heart';
+        el.style.left=Math.random()*100+'%';
+        el.style.top=Math.random()*100+'%';
+        el.style.fontSize=(14+Math.random()*36)+'px';
+        el.style.opacity=(0.06+Math.random()*0.25);
+        el.style.animationDuration=(6+Math.random()*8)+'s';
+        el.innerText='❤';
+        heartsContainer.appendChild(el);
+      }
+    }
+    createHearts(14);
+
+    // move the No button to a random place inside the card when touched/clicked
+    function moveNoButton(){
+      const card = document.getElementById('app');
+      const rect = card.getBoundingClientRect();
+      const btn = noBtn;
+      const btnW = 90, btnH = 44; // approximate
+      // calculate safe area
+      const padding = 18;
+      const minX = padding; const maxX = rect.width - btnW - padding;
+      const minY = padding + 40; const maxY = rect.height - btnH - 90;
+      const x = Math.max(minX, Math.random()*(maxX-minX)+minX);
+      const y = Math.max(minY, Math.random()*(maxY-minY)+minY);
+      btn.style.transition='transform 0.28s cubic-bezier(.2,.9,.3,1)';
+      btn.style.transform=`translate(${x}px, ${y}px)`;
+    }
+
+    // respond to "No" touches — move the button each time
+    function handleNoInteraction(e){
+      e.preventDefault();
+      moveNoButton();
+      // optional playful sound (requires user to allow audio) — omitted for simplicity
+    }
+
+    // go to next page on Yes
+    function goNext(){
+      pageIndex++;
+      if(pageIndex < pages.length-1){
+        const p = pages[pageIndex];
+        titleEl.textContent = p.title;
+        subtitleEl.textContent = p.text;
+        // reset No button position for continued playfulness
+        noBtn.style.transform = 'translate(0,0)';
+      } else if(pageIndex === pages.length-1){
+        // final page
+        showFinal();
+      } else {
+        // if beyond final, restart
+        pageIndex = 0; resetToStart();
+      }
+    }
+
+    function resetToStart(){
+      titleEl.textContent = 'You have 2 minutes?';
+      subtitleEl.textContent = 'Can you spare two minutes for a small Diwali surprise?';
+      noBtn.style.transform = 'translate(0,0)';
+    }
+
+    function showFinal(){
+      const p = pages[pages.length-1];
+      titleEl.textContent = p.title;
+      subtitleEl.textContent = p.text;
+      // hide buttons and show a big message + balloons
+      document.getElementById('buttons').style.display='none';
+
+      // big heart + message
+      const big = document.createElement('div');
+      big.style.marginTop='12px';
+      big.innerHTML = `<div style="font-size:28px;font-weight:700;color:#6b2346">${p.text.split('\n')[0]}</div><div style="margin-top:8px;font-size:18px;color:#8a3b5a">${p.text.split('\n')[1]|| ''}</div>`;
+      screen.appendChild(big);
+
+      // create balloons
+      createBalloons(8);
+
+      // small confetti-ish hearts burst
+      burstTinyHearts();
+    }
+
+    function createBalloons(n=6){
+      const colors = ['#ff98c8','#ff6fb1','#ffd27a','#ffb3e6','#ff7fa3','#ffe6f4'];
+      for(let i=0;i<n;i++){
+        const b = document.createElement('div');
+        b.className='balloon';
+        const left = Math.random()*100;
+        b.style.left = left + '%';
+        b.style.width = (32 + Math.random()*36)+'px';
+        b.style.height = (40 + Math.random()*40)+'px';
+        b.style.background = colors[i % colors.length];
+        b.style.animationDuration = (8 + Math.random()*10) + 's';
+        b.style.opacity = 0.9;
+        balloonsContainer.appendChild(b);
+      }
+    }
+
+    function burstTinyHearts(){
+      for(let i=0;i<24;i++){
+        const h = document.createElement('div');
+        h.innerText='❤';
+        h.style.position='absolute';
+        h.style.left=(50 + (Math.random()-0.5)*60)+'%';
+        h.style.top=(50 + (Math.random()-0.5)*36)+'%';
+        h.style.fontSize=(12+Math.random()*20)+'px';
+        h.style.opacity=0.9;
+        h.style.transform='translate(-50%,-50%)';
+        h.style.transition='all 1.8s cubic-bezier(.2,.8,.2,1)';
+        screen.appendChild(h);
+        (function(el){
+          requestAnimationFrame(()=>{
+            el.style.left=(20+Math.random()*60)+'%';
+            el.style.top=(0+Math.random()*40)+'%';
+            el.style.opacity='0.02';
+            el.style.transform='translate(-50%,-50%) scale(1.6)';
+          });
+        })(h);
+      }
+    }
+
+    // attach events
+    yesBtn.addEventListener('click', goNext);
+    // support tapping on mobile for No button
+    noBtn.addEventListener('click', handleNoInteraction);
+    // for extra playfulness, also move on touchstart (sometimes click is delayed on mobile)
+    noBtn.addEventListener('touchstart', handleNoInteraction);
+
+    // ensure no button is initially inline; set its transform origin
+    noBtn.style.transform='translate(0,0)';
+
+    // small accessibility: allow keyboard
+    document.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){goNext()}
+      if(e.key==='N' || e.key==='n'){moveNoButton()}
+    });
+
+  </script>
+</body>
+</html>
